@@ -1,0 +1,81 @@
+import os
+import yaml
+import pandas as pd
+import numpy as np
+import argparse
+from pkgutil import get_data
+from get_data import get_data, read_param
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error,mean_squared_error,r2_score
+from sklearn.linear_model import ElasticNet
+import joblib
+import json
+import mlflow
+from urllib.parse import urlparse
+
+def eval_metrics(actual, pred):
+    rmse = np.sqrt(mean_squared_error(actual, pred))
+    mae = mean_absolute_error(actual, pred)
+    r2 = r2_score(actual, pred)
+    return rmse, mae, r2
+
+def train_and_evaluate(config_path):
+    config = read_param(config_path)
+    train_data_path = config["split_data"]["train_path"]
+    test_data_path = config["split_data"]["test_path"]
+    raw_data_path = config["load_data"]["clean_data"]
+    split_data = config["split_data"]["test_size"]
+    random_state = config["base"]["random_state"]
+    df = pd.read_csv(raw_data_path, sep=",")
+    model_dir = config["model_path"]
+
+    alpha = config["estimators"]["ElasticNet"]["params"]["alpha"]
+    l1_ratio = config["estimators"]["ElasticNet"]["params"]["l1_ratio"]
+
+    target = config["base"]["target_col"]
+    train = pd.read_csv(train_data_path)
+    test = pd.read_csv(test_data_path)
+
+    y_train = train[target]
+    y_test = test[target]
+
+    X_train = train.drop(target, axis=1)
+    X_test = test.drop(target, axis = 1)
+
+    lr = ElasticNet(alpha=alpha, l1_ratio=l1_ratio,random_state=random_state)
+    lr.fit(X_train, y_train)
+
+    y_predicted = lr.predict(X_test)
+
+    (rmse,mae,r2) = eval_metrics(y_test,y_predicted)
+
+    print("ElasticNet model (alpha=%f, l1_ratio=%f):" % (alpha, l1_ratio))
+
+    scores_files = config["reports"]["score"]
+    params_files = config["reports"]["params"]
+
+    with open(scores_files, "w") as f:
+        scores = {
+            "rmse": rmse,
+            "mae": mae,
+            "r2": r2
+        }
+        json.dump(scores, f,)
+        with open(params_files, "w") as f:
+            params = {
+                "alpha": alpha,
+                "l1_ratio": l1_ratio
+            }
+            json.dump(params, f)
+        model_path = config["model_path"]
+        joblib.dump(lr, model_path)
+
+            
+
+
+
+if __name__=="__main__":
+    args = argparse.ArgumentParser()
+    args.add_argument("--config", default="params.yml")
+    parsed_args= args.parse_args()
+    train_and_evaluate(config_path=parsed_args.config)

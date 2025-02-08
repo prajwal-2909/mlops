@@ -15,20 +15,20 @@ split_data:
   test_size: 0.2
 
 estimators:
-  ElasticNet:
+  RandomForest:
     params:
-      alpha: 0.9
-      l1_ratio: 0.2
+      n_estimators: 100
+      max_depth: 4
 
 model_path: models/models.joblib
 
-# reports:
-#   params: reports/params.json
-#   score: reports/scores.json
+reports:
+   params: reports/params.json
+   score: reports/scores.json
 
 mlflow_config:
   artifact_dir: artifacts
-  experiment_name: insurance_experiment
+  experiment_name: insurance_aissms
   run_name: mlops
-  registered_model_name: ElasticNet
+  registered_model_name: RandomForest
   remote_server_uri: http://127.0.0.1:5000
